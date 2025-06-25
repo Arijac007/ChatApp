@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block head %}
+<HEAD>
+    <title>Room {{ room_code }}</title>
+    <script src="/static/main.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+</HEAD>
+{% endblock %}
+{% block content %}
+<body>
+<div class="index-container">
+    <h2>Current room: {{ room_code }}</h2>
+    <h3>Username: {{ username }}</h3>
+    <br><h3>JOIN</h3>
+    <label>Room Code (max 16 letters):</label><br>
+<form method="POST" action="{{ url_for('join') }}"><br>
+  <input type="text" name="room_code" placeholder="Enter room code (optional)"><br><br>
+  <input type="text" name="username" placeholder="Enter username (optional)"><br><br>
+  <button type="submit">Join Room</button>
+</form>
+</div>
+</body>
+
+{% endblock %}

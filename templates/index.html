@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="index-container-home">
+    <h1>Welcome to Bit by Bit chat</h1>
+    <p> If you'd like to chat with us, please click on the button below...</p>
+    <a href="{{ url_for('rooms', room_code='lobby', username='guest') }}"><button type="button" class="btn btn-primary">Click me!</button></a>
+    <p> If button is not loading please refresh the website!</p>
+</div>
+
+{% endblock %}

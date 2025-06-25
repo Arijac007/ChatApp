@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script>      const localUsername = "{{ username | e }}";  // ✅ Set JS variable first
+</script>
+</head>
+<body>
+<div class="base-body">
+  <div class="base-content">
+    <div class="navbar">
+        <div class="links">
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('rooms', room_code='guest', username='guest') }}">About</a>
+        </div>
+    </div>
+  </div>
+    {% block content %}
+
+{% endblock %}
+</div>
+</body>
+</html>

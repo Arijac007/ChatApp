@@ -1,0 +1,129 @@
+*{
+    font-family: "C64 Pro"
+
+}
+
+p {
+    color: white;
+    padding: 5px;
+}
+h1 {
+    color: white;
+}
+h3 {
+    color: white;
+}
+h2 {
+    color: white;
+}
+
+button {
+    color: ghostwhite;
+    padding: 5px;
+    background-color: purple;
+    border-radius: 5px;
+    border: 1px antiquewhite solid;
+}
+
+.input-tab{
+    width: 100%;
+    display: inline-block;
+    flex-direction: inherit;
+    align-items: flex-start;
+    align-content: space-between;
+
+}
+label {
+    color: white;
+}
+
+button:hover {
+    color: gainsboro;
+
+
+}
+
+input {
+    border-radius: 5px;
+    padding: 5px;
+}
+
+
+.base-body{
+    border: 2px white solid;
+    height: 100% ;
+    border-radius: 15px;
+    padding-left: 15px;
+    padding-right: 15px;
+    padding-bottom: 15px;
+}
+.base-content{
+    background-color: #660066;
+    color: white;
+}
+.chat-container{
+    background-color: lightslategray;
+    padding: 10px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+}
+.chat-messages{
+    height: 500px;
+}
+.room-details{
+    background-color: rgba(51, 0, 51, 0.5);
+    border: 2px #993399 solid;
+    height: 100%;
+    border-radius: 15px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.index-container{
+    background-color: rgba(51, 0, 51, 0.5);
+    border: 2px #993399 solid;
+    height: 100%;
+    border-radius: 15px;
+    padding: 10px;
+}
+.index-container-home{
+    background-color: rgba(51, 0, 51, 0.5);
+    border: 2px #993399 solid;
+    height: 100%;
+    border-radius: 15px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.base-body{
+    background-color: #660066;
+    border: 2px #993399 solid;
+    border-radius: 15px;
+}
+.links{
+    background-color: #330033;
+    border-radius: 15px;
+    justify-content: center;
+    padding: 10px;
+}
+.navbar{
+    background-color: ;
+    margin: 10px;
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-top: 5px;
+
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-content: space-between;
+}
+
+.navbar a{
+    text-decoration: none;
+    color: white;
+}

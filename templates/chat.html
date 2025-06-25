@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="room-details">
+<h3>Current room: {{ room_code }}</h3>
+    <h3>Username: {{ username }}</h3>
+</div>
+<div class="index-container">
+  <div id="chatBox" class="chat-messages">
+      {% for message in messages %}
+            <p>{{ messages }}</p>
+        {% endfor %}
+  </div>
+  <div class="input-tab"><input type="text" id="messageInput" placeholder="Nemoj divanit gluposti..." />
+  <button id="sendButton" onclick="sendMessage()" disabled>Send</button>
+  <button onclick="rotateCryptoKey()">🔐 Switch Key</button></div>
+
+  <script src="/static/main.js"></script>
+{% endblock %}
+
+
