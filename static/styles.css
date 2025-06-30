@@ -1,5 +1,13 @@
+@font-face {
+  font-family: 'Commodore64';
+  src: url('/static/font/Commodore64.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+
 *{
-    font-family: "C64 Pro"
+    font-family: "Commodore64"
 
 }
 
