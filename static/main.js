@@ -1,236 +1,145 @@
-const peerConnection = new RTCPeerConnection();
+let peerConnection;
 let dataChannel;
+let ws;
 let cryptoKey;
-let ecdhKeyPair;
 let isInitiator = false;
 
+const localUsername = window.localUsername;
 
-// === WebSocket Signaling ===
-const ws = new WebSocket("ws://localhost:8765");
-
-ws.onopen = () => {
-    console.log("✅ WebSocket connected");
-    isInitiator = true;
-
-    if (isInitiator) {
-    dataChannel = peerConnection.createDataChannel("chat");
-    setupDataChannel();
+async function getTurnCreds() {
+  const res = await fetch(`/get-turn-creds?user=${localUsername}`);
+  return await res.json();
 }
 
-peerConnection.ondatachannel = (event) => {
-    dataChannel = event.channel;
-    setupDataChannel();
-};
+async function startConnection() {
+  const creds = await getTurnCreds();
 
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:gojsi.cc:3478",
+        username: creds.username,
+        credential: creds.password
+      }
+    ]
+  });
 
-    peerConnection.createOffer()
-        .then(offer => peerConnection.setLocalDescription(offer))
-        .then(() => {
-            ws.send(JSON.stringify({ offer: peerConnection.localDescription }));
-        });
-};
+  ws = new WebSocket("wss://gojsi.cc:8765");
 
-
-ws.onmessage = async (event) => {
+  ws.onmessage = async (event) => {
     const data = JSON.parse(event.data);
 
-    if (data.offer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        ws.send(JSON.stringify({ answer }));
-    } else if (data.answer) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-    } else if (data.candidate) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
-};
-
-peerConnection.onicecandidate = (event) => {
-    if (event.candidate && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ candidate: event.candidate }));
-    }
-};
-
-// === Data Channel Setup ===
-async function rotateCryptoKey() {
-    if (!dataChannel || dataChannel.readyState !== "open") {
-        console.warn("❌ Cannot rotate key: dataChannel not ready");
-        return;
+    if (data.offer && !isInitiator) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      ws.send(JSON.stringify({ answer }));
     }
 
-    console.log("🔄 Attempting to rotate encryption key...");
-    document.getElementById("sendButton").disabled = true;
-    cryptoKey = null; // Invalidate old key
+    if (data.answer && isInitiator) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    }
 
-    await generateECDHKeyPair(); // new key pair
+    if (data.candidate) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+  };
 
-    const publicKey = await crypto.subtle.exportKey("jwk", ecdhKeyPair.publicKey);
-    dataChannel.send(JSON.stringify({ type: "key", data: publicKey, respond: true }));
-    console.log("🔐 New key sent to peer.");
+  ws.onopen = async () => {
+    console.log("✅ WebSocket connected");
+
+    isInitiator = true; // or assign based on signaling logic
+    if (isInitiator) {
+      dataChannel = peerConnection.createDataChannel("chat");
+      setupDataChannel();
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      ws.send(JSON.stringify({ offer }));
+    }
+  };
+
+  peerConnection.ondatachannel = (event) => {
+    dataChannel = event.channel;
+    setupDataChannel();
+  };
+
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      ws.send(JSON.stringify({ candidate: event.candidate }));
+    }
+  };
 }
-
-
-
-function checkKeyReady() {
-    const sendBtn = document.getElementById("sendButton");
-    if (!sendBtn) {
-        console.error("❌ sendButton not found in DOM.");
-        return;
-    }
-
-    if (cryptoKey) {
-        sendBtn.disabled = false;
-    } else {
-        sendBtn.disabled = true;
-        setTimeout(checkKeyReady, 500); // Try again after 500ms
-    }
-}
-
 
 function setupDataChannel() {
-    dataChannel.onopen = async () => {
-        console.log("📡 Data channel open");
-        const publicKey = await generateECDHKeyPair();
-        console.log("🔑 Sending my public key:", publicKey);
-        dataChannel.send(JSON.stringify({ type: "key", data: publicKey }));
-
-        setInterval(() => {
-        rotateCryptoKey();
-        }, 10 * 60 * 1000);
-
-    };
-
-    dataChannel.onmessage = async (event) => {
-    const msg = JSON.parse(event.data);
-
-    if (msg.type === "key") {
-        console.log("🔐 Received peer public key");
-
-        if (!ecdhKeyPair) {
-            console.log("🔄 Generating my new ECDH key pair in response...");
-            await generateECDHKeyPair();
-        }
-
-        await deriveSharedKey(msg.data);
-        console.log("✅ Shared key re-established");
-        document.getElementById("sendButton").disabled = false;
-
-        // 🔁 Send back my public key if this is a response to rotation
-        if (msg.respond !== false) {
-            const publicKey = await crypto.subtle.exportKey("jwk", ecdhKeyPair.publicKey);
-            dataChannel.send(JSON.stringify({ type: "key", data: publicKey, respond: false }));
-        }
-    }
-    else if (msg.type === "message") {
-        if (!cryptoKey) {
-            console.warn("⚠️ Cannot decrypt: shared key not ready");
-            return;
-        }
-        const decrypted = await decryptMessage(msg.data);
-        const sender = msg.username || "Peer";
-        displayMessage(sender, decrypted);
-    }
-};
-
-
-
+  dataChannel.onmessage = async (event) => {
+    const decrypted = await decryptMessage(event.data);
+    displayMessage("Peer", decrypted);
+  };
 }
 
-
-// === ECDH Key Exchange ===
-async function generateECDHKeyPair() {
-    ecdhKeyPair = await crypto.subtle.generateKey(
-        { name: "ECDH", namedCurve: "P-256" },
-        true,
-        ["deriveKey"]
-    );
-    return await crypto.subtle.exportKey("jwk", ecdhKeyPair.publicKey);
+// === Encryption ===
+async function generateCryptoKey() {
+  const key = await window.crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+  cryptoKey = key;
 }
 
-async function deriveSharedKey(peerPublicKeyJwk) {
-    console.log("🔧 Deriving key from peer JWK:", peerPublicKeyJwk);
-    const peerKey = await crypto.subtle.importKey(
-        "jwk", peerPublicKeyJwk, { name: "ECDH", namedCurve: "P-256" }, true, []
-    );
-    cryptoKey = await crypto.subtle.deriveKey(
-        { name: "ECDH", public: peerKey },
-        ecdhKeyPair.privateKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt", "decrypt"]
-    );
-    console.log("🔐 Derived shared cryptoKey:", cryptoKey);
-}
-
-
-// === AES-GCM Encrypt/Decrypt ===
-async function encryptMessage(message) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encoded = new TextEncoder().encode(message);
-    const ciphertext = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv }, cryptoKey, encoded
-    );
-    return { iv: Array.from(iv), data: Array.from(new Uint8Array(ciphertext)) };
+async function encryptMessage(msg) {
+  const enc = new TextEncoder();
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    cryptoKey,
+    enc.encode(msg)
+  );
+  return JSON.stringify({
+    iv: Array.from(iv),
+    ciphertext: Array.from(new Uint8Array(ciphertext))
+  });
 }
 
 async function decryptMessage(payload) {
-    const iv = new Uint8Array(payload.iv);
-    const data = new Uint8Array(payload.data);
-    const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv }, cryptoKey, data
-    );
-    return new TextDecoder().decode(decrypted);
+  const { iv, ciphertext } = JSON.parse(payload);
+  const dec = new TextDecoder();
+  const buffer = new Uint8Array(ciphertext);
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: new Uint8Array(iv) },
+    cryptoKey,
+    buffer
+  );
+  return dec.decode(decrypted);
 }
 
-// === Message Sending ===
-// === Message sending ===
+// === Messaging ===
 async function sendMessage() {
-    const input = document.getElementById("messageInput");
-    const msg = input.value.trim();
-    if (!msg) return;
+  const input = document.getElementById("messageInput");
+  const msg = input.value.trim();
+  if (!msg || !cryptoKey || !dataChannel || dataChannel.readyState !== "open") return;
 
-    if (!cryptoKey) {
-        alert("🔐 Shared encryption key is not established yet.");
-        return;
-    }
-
-    if (!dataChannel || dataChannel.readyState !== "open") {
-        alert("🔌 Data channel is not connected.");
-        return;
-    }
-
-    const encrypted = await encryptMessage(msg);
-    dataChannel.send(JSON.stringify({ type: "message", username: localUsername, data: encrypted}));
-
-    displayMessage("You", msg);
-    input.value = '';
+  const encrypted = await encryptMessage(msg);
+  dataChannel.send(encrypted);
+  displayMessage("You", msg);
+  input.value = "";
 }
 
-// === Chat UI ===
 function displayMessage(sender, text) {
-    const chatBox = document.getElementById("chatBox");
-    if (!chatBox) {
-        console.error("⚠️ chatBox element not found in HTML.");
-        return;
-    }
-
-    const p = document.createElement("p");
-    p.textContent = `${sender}: ${text}`;
-    chatBox.appendChild(p);
+  const chatBox = document.getElementById("chatBox");
+  const p = document.createElement("p");
+  p.textContent = `${sender}: ${text}`;
+  chatBox.appendChild(p);
 }
 
-// === One-time setup when page loads ===
-window.onload = () => {
-    const input = document.getElementById("messageInput");
-    input.focus();
+window.onload = async () => {
+  await generateCryptoKey();
+  await startConnection();
 
-    input.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-            event.preventDefault(); // prevent form submit
-            sendMessage();
-        }
-    });
-
-    checkKeyReady(); // if you’re using it
+  document.getElementById("sendButton").addEventListener("click", sendMessage);
+  document.getElementById("messageInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
 };
